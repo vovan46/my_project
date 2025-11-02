@@ -1,0 +1,17 @@
+with open('new.txt', 'r', encoding='utf-8') as file:
+    users = {}
+    for line in file:
+        if not line:
+            continue
+        parts = line.split('"')
+        name = parts[1] 
+        schet = parts[2].strip()
+        acc, itog = schet.split(':')
+        account = int(acc.replace('-', '').strip())
+        itog_str = itog.strip()
+        if itog_str[0] == '+':
+            itog1 = float(itog_str[1:])
+        else:  
+            itog1 = -float(itog_str[1:])
+        if name not in users:
+            users[name] = {}
