@@ -3,7 +3,7 @@ import rich
 
 
 def main():
-    rich.print('Hello World from "2025"')
+    rich.print('Hello ')
 
 
 if __name__ == "__main__":
