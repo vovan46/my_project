@@ -1,0 +1,228 @@
+import sqlite3
+import re
+from datetime import datetime
+
+
+
+DB_NAME = "users.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        age INTEGER,
+        phone TEXT UNIQUE
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+def user_exists(phone):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM users WHERE phone = ?", (phone,))
+    user = cursor.fetchone()
+
+    conn.close()
+    return user is not None
+
+def save_user(age, phone):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("INSERT INTO users (age, phone) VALUES (?, ?)", (age, phone))
+
+    conn.commit()
+    conn.close()
+
+
+
+
+def parse_text(value):
+    if value is None or value.strip() == "":
+        return None
+    return value.strip()
+
+def parse_int(value):
+    if value is None or value.strip() == "":
+        return None
+    try:
+        return int(value.strip())
+    except ValueError:
+        raise ValueError(f"'{value}' не подходит")
+
+def parse_date(value):
+    if value is None or value.strip() == "":
+        return None
+    try:
+        day, month, year = map(int, value.strip().split('.'))
+        return (day, month, year)
+    except ValueError:
+        raise ValueError(f"'{value}' это не дата")
+
+
+
+
+def required(value):
+    if value is None:
+        return False, "Поле обязательно"
+    return True, ""
+
+def not_empty(value):
+    if value is not None and len(value.strip()) == 0:
+        return False, "Пустая строка"
+    return True, ""
+
+def min_length(min_len):
+    def validator(value):
+        if value is not None and len(value) < min_len:
+            return False, f"Минимальная длина {min_len}"
+        return True, ""
+    return validator
+
+def max_length(max_len):
+    def validator(value):
+        if value is not None and len(value) > max_len:
+            return False, f"Максимальная длина {max_len}"
+        return True, ""
+    return validator
+
+def min_value(min_val):
+    def validator(value):
+        if value is not None and value < min_val:
+            return False, f"Минимум {min_val}"
+        return True, ""
+    return validator
+
+def max_value(max_val):
+    def validator(value):
+        if value is not None and value > max_val:
+            return False, f"Максимум {max_val}"
+        return True, ""
+    return validator
+
+
+def phone(value):
+    if value is None:
+        return True, ""
+    pattern = r'^\+7\d{10}$'
+    if not re.match(pattern, value):
+        return False, "Формат: +79991234567"
+    return True, ""
+
+def email(value):
+    if value is None:
+        return True, ""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(pattern, value):
+        return False, "Некорректный email"
+    return True, ""
+
+def past(value):
+    if value is None:
+        return True, ""
+    day, month, year = value
+    if datetime(year, month, day) >= datetime.now():
+        return False, "Дата должна быть в прошлом"
+    return True, ""
+
+def future(value):
+    if value is None:
+        return True, ""
+    day, month, year = value
+    if datetime(year, month, day) <= datetime.now():
+        return False, "Дата должна быть в будущем"
+    return True, ""
+
+
+
+
+def validate_age(age_value):
+    if not age_value or str(age_value).strip() == "":
+        return False, "Возраст обязателен"
+
+    try:
+        age = int(str(age_value).strip())
+    except ValueError:
+        return False, "Возраст должен быть числом"
+
+    if age < 18:
+        return False, "Минимальный возраст: 18 лет"
+    elif age > 120:
+        return False, "Максимальный возраст: 120 лет"
+
+    return True, age
+
+
+def validate_phone(phone_value):
+    if not phone_value or str(phone_value).strip() == "":
+        return True, None
+
+    phone = str(phone_value).strip()
+
+    if not phone.startswith("+7"):
+        return False, "Телефон должен начинаться с +7"
+    if len(phone) != 12:
+        return False, "Телефон должен содержать 12 символов"
+    if not phone[2:].isdigit():
+        return False, "После +7 должны быть только цифры"
+
+    return True, phone
+
+
+def validate_form():
+    errors = {}
+    user_data = {}
+
+    print("\n=== ВОЗРАСТ ===")
+    age_input = input("Введите возраст: ")
+    age_ok, age_result = validate_age(age_input)
+
+    if age_ok:
+        user_data["age"] = age_result
+    else:
+        errors["age"] = age_result
+
+    print("\n=== ТЕЛЕФОН ===")
+    phone_input = input("Введите телефон (+7...): ")
+    phone_ok, phone_result = validate_phone(phone_input)
+
+    if phone_ok:
+        user_data["phone"] = phone_result
+    else:
+        errors["phone"] = phone_result
+
+    return len(errors) == 0, errors, user_data
+
+
+
+if __name__ == "__main__":
+    init_db()
+
+    success, errors, data = validate_form()
+
+    if not success:
+        print("\n❌ Ошибки:")
+        for field, err in errors.items():
+            print(f"{field}: {err}")
+    else:
+        phone = data.get("phone")
+
+        if phone and user_exists(phone):
+            print("\n❌ Пользователь уже существует!")
+        else:
+            save_user(data["age"], phone)
+            print("\n✅ Регистрация успешна!")
+
+            age = data["age"]
+            if age < 30:
+                print("Категория: Молодые")
+            elif age < 60:
+                print("Категория: Взрослые")
+            else:
+                print("Категория: Старые")
